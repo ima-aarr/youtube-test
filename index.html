@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>youtube sender</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background: #f9f9f9; }
+        .box { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9em; }
+        input, textarea, select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button.danger { background: #dc2626; }
+        hr { border: none; border-top: 1px solid #eee; margin: 20px 0; }
+    </style>
+</head>
+<body>
+
+    <div class="box">
+        <h3>1. アカウントCookie登録</h3>
+        <div class="form-group">
+            <label>アカウント名（管理用）</label>
+            <input type="text" id="accountName" placeholder="例: サブ垢A">
+        </div>
+        <div class="form-group">
+            <label>cookies.txt の中身</label>
+            <textarea id="newCookieText" rows="3" placeholder="# Netscape HTTP Cookie File..."></textarea>
+        </div>
+        <button onclick="addAccount()">アカウントを保存</button>
+    </div>
+
+    <div class="box">
+        <h3>2. メッセージ送信</h3>
+        <div class="form-group">
+            <label>送信元アカウント</label>
+            <select id="accountSelect">
+                <option value="">アカウントを登録してください</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>送信先タイプ</label>
+            <select id="targetType">
+                <option value="video">動画コメント</option>
+                <option value="live">ライブチャット</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>動画ID (またはライブチャットID)</label>
+            <input type="text" id="targetId" placeholder="例: dQw4w9WgXcQ">
+        </div>
+        <div class="form-group">
+            <label>メッセージ</label>
+            <textarea id="message" rows="3" placeholder="送信するテキスト"></textarea>
+        </div>
+        <div class="form-group">
+            <label>APIシークレット</label>
+            <input type="password" id="secret" placeholder="Workerのパスワード">
+        </div>
+        <button onclick="sendMessage()" style="background: #16a34a; width: 100%;">送信リクエスト</button>
+        <p id="status" style="margin-top: 15px; font-weight: bold;"></p>
+    </div>
+
+    <script>
+        let accounts = JSON.parse(localStorage.getItem('ytAccounts') || '[]');
+
+        function updateAccountSelect() {
+            const select = document.getElementById('accountSelect');
+            select.innerHTML = '';
+            if (accounts.length === 0) {
+                select.innerHTML = '<option value="">アカウントを登録してください</option>';
+                return;
+            }
+            accounts.forEach((acc, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = acc.name;
+                select.appendChild(option);
+            });
+        }
+
+        function addAccount() {
+            const name = document.getElementById('accountName').value;
+            const cookieText = document.getElementById('newCookieText').value;
+            
+            if (!name || !cookieText) return alert("アカウント名とCookieを入力してください");
+
+            accounts.push({ name, cookieText });
+            localStorage.setItem('ytAccounts', JSON.stringify(accounts));
+            
+            document.getElementById('accountName').value = '';
+            document.getElementById('newCookieText').value = '';
+            updateAccountSelect();
+            alert("保存しました");
+        }
+
+        async function sendMessage() {
+            const statusEl = document.getElementById('status');
+            const accountIndex = document.getElementById('accountSelect').value;
+            
+            if (accountIndex === "") return alert("アカウントを選択してください");
+            
+            const selectedAccount = accounts[accountIndex];
+            statusEl.innerText = "送信中... (これには数秒かかる場合があります)";
+            statusEl.style.color = "#2563eb";
+
+            const payload = {
+                type: document.getElementById('targetType').value,
+                targetId: document.getElementById('targetId').value,
+                message: document.getElementById('message').value,
+                cookieText: selectedAccount.cookieText,
+                secret: document.getElementById('secret').value
+            };
+
+            try {
+                const response = await fetch('https://misty-block-8c7f.s103765s103765.workers.dev/api/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.text();
+                statusEl.innerText = "結果: " + result;
+                statusEl.style.color = response.ok ? "#16a34a" : "#dc2626";
+            } catch (error) {
+                statusEl.innerText = "エラーが発生しました: " + error.message;
+                statusEl.style.color = "#dc2626";
+            }
+        }
+
+        // 初期化処理
+        updateAccountSelect();
+    </script>
+</body>
+</html>
